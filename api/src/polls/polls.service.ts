@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { HydratedDocument, isObjectIdOrHexString, Model } from 'mongoose';
 import type { Poll } from './poll.schema.js';
@@ -28,8 +28,16 @@ export class PollsService {
     return toResults(await this.findPoll(pollId));
   }
 
-  async vote(pollId: string, participantId: string, optionId: string): Promise<PollResults> {
+  async vote(
+    pollId: string,
+    participantId: string,
+    optionId: string,
+  ): Promise<PollResults> {
     const poll = await this.findPoll(pollId);
+
+    // Reject if poll is closed
+    if (poll.closed) throw new ConflictException('Poll is closed');
+    
     const option = poll.options.id(optionId);
     if (!option) throw new NotFoundException('Option not found');
 
@@ -38,8 +46,17 @@ export class PollsService {
     return toResults(poll);
   }
 
+  async close(pollId: string): Promise<PollResults> {
+    const poll = await this.findPoll(pollId);
+    poll.closed = true;
+    await poll.save();
+    return toResults(poll);
+  }
+
   private async findPoll(pollId: string) {
-    const poll = isObjectIdOrHexString(pollId) ? await this.pollModel.findById(pollId) : null;
+    const poll = isObjectIdOrHexString(pollId)
+      ? await this.pollModel.findById(pollId)
+      : null;
     if (!poll) throw new NotFoundException('Poll not found');
     return poll;
   }
