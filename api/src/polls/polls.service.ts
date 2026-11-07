@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { isObjectIdOrHexString, Model, Types } from 'mongoose';
+import { HydratedDocument, isObjectIdOrHexString, Model } from 'mongoose';
 import type { Poll } from './poll.schema.js';
 
 // What the API returns for a poll.
@@ -21,38 +21,42 @@ export class PollsService {
       question,
       options: options.map((text) => ({ text })),
     });
-    return this.getResults(poll.id);
+    return toResults(poll);
   }
 
   async getResults(pollId: string): Promise<PollResults> {
-    if (!isObjectIdOrHexString(pollId)) throw new NotFoundException('Poll not found');
-    const id = new Types.ObjectId(pollId);
+    return toResults(await this.findPoll(pollId));
+  }
 
-    // The poll without voter ids.
-    const poll = await this.pollModel.findById(id, { votes: 0 }).lean();
+  async vote(pollId: string, participantId: string, optionId: string): Promise<PollResults> {
+    const poll = await this.findPoll(pollId);
+    const option = poll.options.id(optionId);
+    if (!option) throw new NotFoundException('Option not found');
+
+    poll.votes.set(participantId, option._id); // one entry per participant; voting again overwrites
+    await poll.save();
+    return toResults(poll);
+  }
+
+  private async findPoll(pollId: string) {
+    const poll = isObjectIdOrHexString(pollId) ? await this.pollModel.findById(pollId) : null;
     if (!poll) throw new NotFoundException('Poll not found');
+    return poll;
+  }
+}
 
-    // Count votes per option in the database to group.
-    const counts = await this.pollModel.aggregate<{ _id: Types.ObjectId; count: number }>([
-      { $match: { _id: id } },
-      { $unwind: '$votes' },
-      { $group: { _id: '$votes.optionId', count: { $sum: 1 } } },
-    ]);
-    const countByOption = new Map(counts.map((c) => [String(c._id), c.count]));
-
-    // Start from the poll's options so options with zero votes are included.
-    const options = poll.options.map((o) => ({
+// Turns a poll document into what the API returns.
+function toResults(poll: HydratedDocument<Poll>): PollResults {
+  const votes = [...poll.votes.values()].map(String); // every vote's optionId
+  return {
+    id: String(poll._id),
+    question: poll.question,
+    closed: poll.closed,
+    totalVotes: votes.length,
+    options: poll.options.map((o) => ({
       id: String(o._id),
       text: o.text,
-      votes: countByOption.get(String(o._id)) ?? 0,
-    }));
-
-    return {
-      id: String(poll._id),
-      question: poll.question,
-      closed: poll.closed,
-      totalVotes: options.reduce((sum, o) => sum + o.votes, 0),
-      options,
-    };
-  }
+      votes: votes.filter((v) => v === String(o._id)).length,
+    })),
+  };
 }

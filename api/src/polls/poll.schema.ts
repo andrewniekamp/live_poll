@@ -8,7 +8,8 @@ export const PollSchema = new Schema({
   options: [{ text: { type: String, required: true } }],
 
   // Votes live inside the poll so each vote/close is one atomic update.
-  votes: [{ _id: false, participantId: String, optionId: Schema.Types.ObjectId }],
+  // A map of participantId -> optionId: one entry per participant, so one vote each.
+  votes: { type: Map, of: Schema.Types.ObjectId, default: {} },
 
   closed: { type: Boolean, default: false },
 });
