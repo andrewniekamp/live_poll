@@ -36,6 +36,13 @@ export class PollsService {
     return toResults(poll);
   }
 
+  // The live session runs one poll at a time: the most recently created one.
+  async getCurrent(): Promise<PollResults> {
+    const poll = await this.pollModel.findOne().sort({ _id: -1 }); // newest first
+    if (!poll) throw new NotFoundException('No poll yet');
+    return toResults(poll);
+  }
+
   async getResults(pollId: string): Promise<PollResults> {
     return toResults(await this.findPoll(pollId));
   }

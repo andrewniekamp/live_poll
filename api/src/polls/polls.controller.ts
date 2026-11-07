@@ -21,6 +21,12 @@ export class PollsController {
     return this.polls.create(body.question, body.options);
   }
 
+  // Must come before @Get(':id'), or "current" would be treated as an id.
+  @Get('current')
+  getCurrent() {
+    return this.polls.getCurrent();
+  }
+
   @Get(':id')
   getResults(@Param('id') id: string) {
     return this.polls.getResults(id);
