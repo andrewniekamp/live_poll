@@ -51,4 +51,38 @@ describe('PollsService', () => {
   it('rejects an unknown poll id', async () => {
     await expect(service.getResults('unknown')).rejects.toThrow(NotFoundException);
   });
+
+  describe('vote', () => {
+    it('counts a vote', async () => {
+      const poll = await service.create('Question?', ['A', 'B']);
+      const [a] = poll.options;
+
+      const results = await service.vote(poll.id, 'p1', a.id);
+
+      expect(results.options.map((o) => o.votes)).toEqual([1, 0]);
+      expect(results.totalVotes).toBe(1);
+    });
+
+    it('adds up votes from different participants', async () => {
+      const poll = await service.create('Question?', ['A', 'B']);
+      const [a] = poll.options;
+
+      await service.vote(poll.id, 'p1', a.id);
+      const results = await service.vote(poll.id, 'p2', a.id);
+
+      expect(results.options.map((o) => o.votes)).toEqual([2, 0]);
+    });
+
+    it('moves a changed vote instead of adding another', async () => {
+      const poll = await service.create('Question?', ['A', 'B']);
+      const [a, b] = poll.options;
+
+      await service.vote(poll.id, 'p1', a.id);
+      const results = await service.vote(poll.id, 'p1', b.id);
+
+      expect(results.options.map((o) => o.votes)).toEqual([0, 1]);
+      expect(results.totalVotes).toBe(1);
+    });
+
+  });
 });
