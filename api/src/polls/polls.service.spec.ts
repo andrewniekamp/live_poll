@@ -85,6 +85,15 @@ describe('PollsService', () => {
       expect(results.options.map((o) => o.votes)).toEqual([0, 1]);
       expect(results.totalVotes).toBe(1);
     });
+
+    it('rejects an option from a different poll', async () => {
+      const poll = await service.create('Question?', ['A', 'B']);
+      const other = await service.create('Other?', ['C', 'D']);
+
+      await expect(
+        service.vote(poll.id, 'p1', other.options[0].id),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('close', () => {
