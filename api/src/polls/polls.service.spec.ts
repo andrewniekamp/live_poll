@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { getModelToken, MongooseModule } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Model } from 'mongoose';
@@ -49,7 +49,9 @@ describe('PollsService', () => {
   });
 
   it('rejects an unknown poll id', async () => {
-    await expect(service.getResults('unknown')).rejects.toThrow(NotFoundException);
+    await expect(service.getResults('unknown')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   describe('vote', () => {
@@ -83,6 +85,29 @@ describe('PollsService', () => {
       expect(results.options.map((o) => o.votes)).toEqual([0, 1]);
       expect(results.totalVotes).toBe(1);
     });
+  });
 
+  describe('close', () => {
+    it('closes a poll', async () => {
+      const poll = await service.create('Question?', ['A', 'B']);
+
+      const results = await service.close(poll.id);
+
+      expect(results.closed).toBe(true);
+    });
+
+    it('rejects votes on a closed poll and keeps the results', async () => {
+      const poll = await service.create('Question?', ['A', 'B']);
+      const [a, b] = poll.options;
+      await service.vote(poll.id, 'p1', a.id);
+      await service.close(poll.id);
+
+      await expect(service.vote(poll.id, 'p1', b.id)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(
+        (await service.getResults(poll.id)).options.map((o) => o.votes),
+      ).toEqual([1, 0]);
+    });
   });
 });
