@@ -1,6 +1,15 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Sse,
+} from '@nestjs/common';
 import { PollsService } from './polls.service.js';
 import { CreatePollDto, VoteDto } from './polls.dto.js';
+import { map, Observable } from 'rxjs';
 
 // Controller should be kept light, business logic belongs in services
 @Controller('polls')
@@ -26,5 +35,12 @@ export class PollsController {
   @HttpCode(200) // Since nothing new is created, return 200 instead of 201
   close(@Param('id') id: string) {
     return this.polls.close(id);
+  }
+
+  @Sse(':id/stream')
+  stream(@Param('id') id: string): Observable<MessageEvent> {
+    return this.polls
+      .resultsStream(id)
+      .pipe(map((data) => ({ data }) as MessageEvent));
   }
 }

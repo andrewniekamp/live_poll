@@ -1,7 +1,12 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { HydratedDocument, isObjectIdOrHexString, Model } from 'mongoose';
 import type { Poll } from './poll.schema.js';
+import { filter, Observable, Subject } from 'rxjs';
 
 // What the API returns for a poll.
 export interface PollResults {
@@ -15,6 +20,13 @@ export interface PollResults {
 @Injectable()
 export class PollsService {
   constructor(@InjectModel('Poll') private readonly pollModel: Model<Poll>) {}
+
+  private readonly updates = new Subject<PollResults>();
+
+  // Returns a stream of updates for a poll. The service emits an update every time a poll is created, voted on, or closed.
+  resultsStream(pollId: string): Observable<PollResults> {
+    return this.updates.pipe(filter((r) => r.id === pollId));
+  }
 
   async create(question: string, options: string[]): Promise<PollResults> {
     const poll = await this.pollModel.create({
@@ -37,20 +49,28 @@ export class PollsService {
 
     // Reject if poll is closed
     if (poll.closed) throw new ConflictException('Poll is closed');
-    
+
     const option = poll.options.id(optionId);
     if (!option) throw new NotFoundException('Option not found');
 
     poll.votes.set(participantId, option._id); // one entry per participant; voting again overwrites
     await poll.save();
-    return toResults(poll);
+
+    // Stream update
+    const results = toResults(poll);
+    this.updates.next(results);
+    return results;
   }
 
   async close(pollId: string): Promise<PollResults> {
     const poll = await this.findPoll(pollId);
     poll.closed = true;
     await poll.save();
-    return toResults(poll);
+
+    // Stream update
+    const results = toResults(poll);
+    this.updates.next(results);
+    return results;
   }
 
   private async findPoll(pollId: string) {
