@@ -4,7 +4,7 @@ Live polling app: facilitators create polls, participants vote, results update i
 
 ## Stack
 
-- `api/` — NestJS + TypeScript, MongoDB via Mongoose, Jest
+- `api/` — NestJS + TypeScript, MongoDB via Mongoose, Vitest (ESM)
 - `web/` — Vue 3 + Vite + TypeScript
 - Real-time results via Server-Sent Events
 - MongoDB runs in Docker as a single-node replica set (needed for transactions)
