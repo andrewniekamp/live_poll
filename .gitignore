@@ -1,0 +1,20 @@
+# Local-only Claude context
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Dependencies and builds
+node_modules/
+dist/
+coverage/
+
+# SQLite data
+*.db
+*.sqlite
+*.sqlite-journal
+
+# Env / OS / editor
+.env
+.env.*
+.DS_Store
+.vscode/
+.idea/
